@@ -1,0 +1,60 @@
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local localPlayer = Players.LocalPlayer
+
+local lastCheckpointCFrame = nil
+
+-- Функция визуального индикатора точки (просто чтобы видеть, где сохранил)
+local function spawnCheckpointVisual(cf)
+    local part = Instance.new("Part")
+    part.Size = Vector3.new(2, 2, 2)
+    part.Shape = Enum.PartType.Ball
+    part.CFrame = cf
+    part.Anchored = true
+    part.CanCollide = false
+    part.Transparency = 0.5
+    part.Color = Color3.fromRGB(0, 255, 0)
+    part.Material = Enum.Material.Neon
+    part.Parent = workspace
+    
+    task.spawn(function()
+        task.wait(1.5)
+        part:Destroy()
+    end)
+end
+
+-- Функция сохранения
+local function saveCheckpoint()
+    local char = localPlayer.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        lastCheckpointCFrame = char.HumanoidRootPart.CFrame
+        spawnCheckpointVisual(lastCheckpointCFrame)
+        print("[RBD]: Чекпоинт установлен вручную!")
+    end
+end
+
+-- Функция телепорта
+local function teleportToCheckpoint()
+    if lastCheckpointCFrame then
+        local char = localPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            char.HumanoidRootPart.CFrame = lastCheckpointCFrame
+            print("[RBD]: Телепорт к последнему чекпоинту!")
+        end
+    else
+        print("[RBD]: Сначала поставь чекпоинт (клавиша Z)!")
+    end
+end
+
+-- Управление клавишами
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == Enum.KeyCode.Z then
+        saveCheckpoint()
+    elseif input.KeyCode == Enum.KeyCode.X then
+        teleportToCheckpoint()
+    end
+end)
+
+print("[RBD Manual]: Z - Сохранить, X - Телепорт. Проклятие готово.")
