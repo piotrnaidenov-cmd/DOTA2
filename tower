@@ -1,0 +1,121 @@
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+local towerModel = nil
+
+-- Функция для удаления башни
+local function deleteTower()
+    if towerModel then
+        towerModel:Destroy()
+        towerModel = nil
+    end
+end
+
+-- Функция для постройки полой Башни Плеяд
+local function buildTower()
+    deleteTower()
+
+    local character = player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+
+    local hrp = character.HumanoidRootPart
+    
+    -- Новые масштабы: башня стала в 10 раз выше и в 2 раза шире
+    local towerHeight = 2000
+    local towerRadius = 60
+    local segments = 32 -- Количество сегментов (стен) для создания круга
+
+    -- Высчитываем позицию спавна с учетом радиуса, чтобы башня не появилась в персонаже
+    local spawnPos = hrp.Position + (hrp.CFrame.LookVector * (towerRadius + 15))
+    spawnPos = Vector3.new(spawnPos.X, hrp.Position.Y - 2, spawnPos.Z)
+
+    -- CFrame, который всегда "смотрит" на игрока (нужен для того, чтобы дверь была прямо перед тобой)
+    local lookAtPos = Vector3.new(hrp.Position.X, spawnPos.Y, hrp.Position.Z)
+    local baseCFrame = CFrame.new(spawnPos, lookAtPos)
+
+    towerModel = Instance.new("Model")
+    towerModel.Name = "PleiadesTowerHollow"
+    towerModel.Parent = workspace
+
+    -- 1. Строим полые стены башни
+    local angleStep = (math.pi * 2) / segments
+    local sideLength = (towerRadius * math.pi * 2) / segments
+
+    for i = 0, segments - 1 do
+        local wall = Instance.new("Part")
+        wall.Anchored = true
+        wall.Material = Enum.Material.Sandstone
+        wall.Color = Color3.fromRGB(210, 190, 150)
+
+        -- i == 0 — это сегмент, который смотрит прямо на игрока. Делаем в нем вход.
+        if i == 0 then
+            local doorHeight = 25
+            wall.Size = Vector3.new(sideLength + 2, towerHeight - doorHeight, 5)
+            -- Поднимаем стену выше, оставляя проход внизу
+            wall.CFrame = baseCFrame 
+                * CFrame.new(0, doorHeight + ((towerHeight - doorHeight) / 2), 0) 
+                * CFrame.Angles(0, i * angleStep, 0) 
+                * CFrame.new(0, 0, -towerRadius)
+        else
+            wall.Size = Vector3.new(sideLength + 2, towerHeight, 5)
+            wall.CFrame = baseCFrame 
+                * CFrame.new(0, towerHeight / 2, 0) 
+                * CFrame.Angles(0, i * angleStep, 0) 
+                * CFrame.new(0, 0, -towerRadius)
+        end
+        wall.Parent = towerModel
+    end
+
+    -- 2. Строим винтовую лестницу внутри
+    local stairCount = 1500 -- Увеличили количество ступенек для высоты 2000
+    local stairHeight = towerHeight * 0.98 -- Лестница идет почти до самой крыши
+    local rotations = 35 -- Количество оборотов лестницы
+
+    for i = 1, stairCount do
+        local step = Instance.new("Part")
+        -- Ширина (вдоль стены), Толщина (высота шага), Глубина (торчит к центру башни)
+        step.Size = Vector3.new(12, 1.5, 18) 
+        step.Anchored = true
+        step.Material = Enum.Material.Wood
+        step.Color = Color3.fromRGB(80, 55, 40)
+
+        local fraction = i / stairCount
+        local yOffset = fraction * stairHeight
+        local angle = fraction * (math.pi * 2 * rotations)
+
+        -- Прикрепляем ступеньки к внутренней стороне стен
+        local centerCFrame = baseCFrame + Vector3.new(0, yOffset, 0)
+        step.CFrame = centerCFrame * CFrame.Angles(0, angle, 0) * CFrame.new(0, 0, -(towerRadius - 9))
+        step.Parent = towerModel
+    end
+
+    -- 3. Добавляем внутреннее освещение
+    for y = 20, towerHeight, 80 do
+        local lightPart = Instance.new("Part")
+        lightPart.Size = Vector3.new(1, 1, 1)
+        lightPart.Position = spawnPos + Vector3.new(0, y, 0)
+        lightPart.Anchored = true
+        lightPart.Transparency = 1 -- Делаем источник света невидимым
+        lightPart.CanCollide = false
+        
+        local light = Instance.new("PointLight")
+        light.Range = 60
+        light.Brightness = 1.5
+        light.Color = Color3.fromRGB(255, 235, 200) -- Теплый свет факелов/магии
+        light.Parent = lightPart
+        
+        lightPart.Parent = towerModel
+    end
+end
+
+-- Отслеживание нажатий
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end 
+
+    if input.KeyCode == Enum.KeyCode.V then
+        buildTower()
+    elseif input.KeyCode == Enum.KeyCode.B then
+        deleteTower()
+    end
+end)
