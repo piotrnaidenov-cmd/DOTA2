@@ -1,0 +1,786 @@
+-- ================= TITAN VISUAL HUB v10 + TOUHOU AURA HUB v2 (FULL MERGE) =================
+-- Объединяет все функции из предыдущих версий + все ауры Touhou 6, 7, 8.
+
+-- Очистка старых меню и конфликтующих GUI
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local workspace = game:GetService("Workspace")
+local lp = Players.LocalPlayer
+
+local cleanNames = {"FixVisualHub", "FixVisualHubV9", "FixVisualHubV10", "TouhouAuraHub", "TouhouHubV2"}
+for _, gui in pairs(CoreGui:GetChildren()) do
+    if table.find(cleanNames, gui.Name) then gui:Destroy() end
+end
+for _, gui in pairs(lp:WaitForChild("PlayerGui"):GetChildren()) do
+    if table.find(cleanNames, gui.Name) then gui:Destroy() end
+end
+
+-- Оригинальные настройки мира
+local origAmbient = Lighting.Ambient
+local origOutdoor = Lighting.OutdoorAmbient
+local origFogColor = Lighting.FogColor
+local origFogEnd = Lighting.FogEnd
+local origGravity = workspace.Gravity
+
+-- === ЭФФЕКТЫ ЦВЕТОКОРРЕКЦИИ ===
+local function createCC(name, sat, cont, tint)
+    local cc = Instance.new("ColorCorrectionEffect", Lighting)
+    cc.Name = name
+    cc.Enabled = false
+    cc.Saturation = sat or 0
+    cc.Contrast = cont or 0
+    if tint then cc.TintColor = tint end
+    return cc
+end
+
+local ccAnime = createCC("HubAnime", 1.5, 0.2)
+local ccNoir = createCC("HubNoir", -1, 0.4)
+local ccMatrix = createCC("HubMatrix", 0, 0.2, Color3.fromRGB(50, 255, 50))
+local ccCyberpunk = createCC("HubCyberpunk", 1.2, 0.3, Color3.fromRGB(255, 100, 255))
+
+-- === СОЗДАНИЕ ИНТЕРФЕЙСА ===
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "FixVisualHubV10"
+ScreenGui.ResetOnSpawn = false
+pcall(function() ScreenGui.Parent = CoreGui end)
+if not ScreenGui.Parent then ScreenGui.Parent = lp:WaitForChild("PlayerGui") end
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 340, 0, 580)
+MainFrame.Position = UDim2.new(0.5, -170, 0.5, -290)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+
+local Header = Instance.new("TextLabel")
+Header.Size = UDim2.new(1, 0, 0, 40)
+Header.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+Header.TextColor3 = Color3.fromRGB(255, 200, 50)
+Header.TextSize = 18
+Header.Font = Enum.Font.GothamBold
+Header.Text = " TITAN VISUAL v10 + TOUHOU "
+Header.Parent = MainFrame
+Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 10)
+
+local Scroll = Instance.new("ScrollingFrame")
+Scroll.Size = UDim2.new(1, -10, 1, -50)
+Scroll.Position = UDim2.new(0, 5, 0, 45)
+Scroll.BackgroundTransparency = 1
+Scroll.ScrollBarThickness = 4
+Scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+Scroll.Parent = MainFrame
+
+local Layout = Instance.new("UIListLayout")
+Layout.Padding = UDim.new(0, 6)
+Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+Layout.SortOrder = Enum.SortOrder.LayoutOrder
+Layout.Parent = Scroll
+
+local layoutCounter = 0
+
+-- === ФУНКЦИИ UI ===
+local function createCategory(text)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -10, 0, 25)
+    lbl.BackgroundTransparency = 1
+    lbl.TextColor3 = Color3.fromRGB(150, 150, 255)
+    lbl.TextSize = 14
+    lbl.Font = Enum.Font.GothamBlack
+    lbl.Text = "— " .. text .. " —"
+    lbl.LayoutOrder = layoutCounter
+    lbl.Parent = Scroll
+    layoutCounter = layoutCounter + 1
+end
+
+local function createToggle(text, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -10, 0, 35)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    btn.TextColor3 = Color3.fromRGB(220, 220, 220)
+    btn.TextSize = 14
+    btn.Font = Enum.Font.GothamSemibold
+    btn.Text = text .. " [ОФФ]"
+    btn.AutoButtonColor = false
+    btn.LayoutOrder = layoutCounter
+    btn.Parent = Scroll
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    layoutCounter = layoutCounter + 1
+
+    local enabled = false
+    btn.MouseButton1Click:Connect(function()
+        enabled = not enabled
+        local targetColor = enabled and Color3.fromRGB(60, 180, 90) or Color3.fromRGB(40, 40, 50)
+        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = targetColor}):Play()
+        btn.Text = text .. (enabled and " [ВКЛ]" or " [ОФФ]")
+        pcall(function() callback(enabled) end)
+    end)
+end
+
+-- === Утилита для удаления аур (по имени эмиттера) ===
+local function removeAura(name)
+    if lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+        for _, v in pairs(lp.Character.HumanoidRootPart:GetChildren()) do
+            if v.Name == name then v:Destroy() end
+        end
+    end
+end
+
+-- ================= ВСЕ ФУНКЦИИ (СОХРАНЯЕМ ВЕСЬ ФУНКЦИОНАЛ) =================
+
+createCategory("🌍 МИР И ПОГОДА")
+
+local rainbowConn
+createToggle("🌈 Радужное небо", function(s)
+    if s then
+        local hue = 0
+        rainbowConn = RunService.RenderStepped:Connect(function()
+            hue = hue + 0.003
+            if hue >= 1 then hue = 0 end
+            Lighting.Ambient = Color3.fromHSV(hue, 1, 1)
+            Lighting.OutdoorAmbient = Color3.fromHSV(hue, 1, 1)
+        end)
+    else
+        if rainbowConn then rainbowConn:Disconnect() end
+        Lighting.Ambient = origAmbient
+        Lighting.OutdoorAmbient = origOutdoor
+    end
+end)
+
+createToggle("👁️ Отдалить камеру (FOV 110)", function(s)
+    workspace.CurrentCamera.FieldOfView = s and 110 or 70
+end)
+createToggle("🌙 Включить Ночь", function(s) Lighting.ClockTime = s and 0 or 14 end)
+createToggle("🌍 Лунная гравитация", function(s) workspace.Gravity = s and 45 or origGravity end)
+createToggle("🌫️ Убрать туман", function(s) Lighting.FogEnd = s and 100000 or origFogEnd end)
+
+createCategory("🎨 ФИЛЬТРЫ И АТМОСФЕРА")
+
+createToggle("🩸 Кровавая Луна (Horror)", function(s)
+    if s then
+        Lighting.Ambient = Color3.fromRGB(120, 0, 0)
+        Lighting.OutdoorAmbient = Color3.fromRGB(200, 0, 0)
+    else
+        Lighting.Ambient = origAmbient
+        Lighting.OutdoorAmbient = origOutdoor
+    end
+end)
+createToggle("🌊 Подводный мир (Глубина)", function(s)
+    if s then
+        Lighting.Ambient = Color3.fromRGB(0, 20, 80)
+        Lighting.OutdoorAmbient = Color3.fromRGB(0, 50, 150)
+        Lighting.FogColor = Color3.fromRGB(0, 30, 100)
+        Lighting.FogEnd = 200
+        workspace.Gravity = 70
+    else
+        Lighting.Ambient = origAmbient
+        Lighting.OutdoorAmbient = origOutdoor
+        Lighting.FogColor = origFogColor
+        Lighting.FogEnd = origFogEnd
+        workspace.Gravity = origGravity
+    end
+end)
+createToggle("🌌 Измерение Пустоты", function(s)
+    if s then
+        Lighting.Ambient = Color3.fromRGB(0, 0, 0)
+        Lighting.OutdoorAmbient = Color3.fromRGB(0, 0, 0)
+        Lighting.FogColor = Color3.fromRGB(0, 0, 0)
+        Lighting.FogEnd = 50
+    else
+        Lighting.Ambient = origAmbient
+        Lighting.OutdoorAmbient = origOutdoor
+        Lighting.FogColor = origFogColor
+        Lighting.FogEnd = origFogEnd
+    end
+end)
+
+createToggle("🎨 Сочные цвета (Аниме)", function(s) ccAnime.Enabled = s end)
+createToggle("🎞️ Черно-белое кино (Noir)", function(s) ccNoir.Enabled = s end)
+createToggle("💻 Хакерский фильтр (Matrix)", function(s) ccMatrix.Enabled = s end)
+createToggle("👾 Киберпанк (Неон)", function(s) ccCyberpunk.Enabled = s end)
+
+createCategory("🧱 МАТЕРИАЛЫ МИРА")
+
+createToggle("🧊 FPS Boost (Гладкий пластик)", function(state)
+    for _, p in pairs(workspace:GetDescendants()) do
+        if p:IsA("BasePart") then
+            if state then
+                if not p:GetAttribute("OldMat") then p:SetAttribute("OldMat", p.Material.Name) end
+                p.Material = Enum.Material.SmoothPlastic
+            else
+                local old = p:GetAttribute("OldMat")
+                if old then pcall(function() p.Material = Enum.Material[old] end) end
+            end
+        end
+    end
+end)
+createToggle("🔮 Неоновый мир", function(state)
+    for _, p in pairs(workspace:GetDescendants()) do
+        if p:IsA("BasePart") then
+            if state then
+                if not p:GetAttribute("OldMat2") then p:SetAttribute("OldMat2", p.Material.Name) end
+                p.Material = Enum.Material.Neon
+            else
+                local old = p:GetAttribute("OldMat2")
+                if old then pcall(function() p.Material = Enum.Material[old] end) end
+            end
+        end
+    end
+end)
+createToggle("🌐 Голографический мир (ForceField)", function(state)
+    for _, p in pairs(workspace:GetDescendants()) do
+        if p:IsA("BasePart") then
+            if state then
+                if not p:GetAttribute("OldMat3") then p:SetAttribute("OldMat3", p.Material.Name) end
+                p.Material = Enum.Material.ForceField
+            else
+                local old = p:GetAttribute("OldMat3")
+                if old then pcall(function() p.Material = Enum.Material[old] end) end
+            end
+        end
+    end
+end)
+createToggle("🪟 Стеклянный мир (X-Ray)", function(state)
+    for _, p in pairs(workspace:GetDescendants()) do
+        if p:IsA("BasePart") then
+            if state then
+                if not p:GetAttribute("OldTrans") then p:SetAttribute("OldTrans", p.Transparency) end
+                p.Transparency = 0.6
+            else
+                local old = p:GetAttribute("OldTrans")
+                if old then p.Transparency = old end
+            end
+        end
+    end
+end)
+
+createCategory("👁️ ESP И ИГРОКИ")
+
+createToggle("👤 Базовый ESP (Обводка)", function(state)
+    if state then
+        _G.ESP = RunService.RenderStepped:Connect(function()
+            for _, plr in pairs(Players:GetPlayers()) do
+                if plr ~= lp and plr.Character then
+                    local hl = plr.Character:FindFirstChild("HubESP") or Instance.new("Highlight", plr.Character)
+                    hl.Name = "HubESP"
+                    hl.FillTransparency = 0.7
+                    hl.OutlineColor = Color3.fromRGB(0, 255, 0)
+                    hl.FillColor = Color3.fromRGB(0, 50, 0)
+                end
+            end
+        end)
+    else
+        if _G.ESP then _G.ESP:Disconnect() end
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("Highlight") and v.Name == "HubESP" then v:Destroy() end
+        end
+    end
+end)
+
+createToggle("🔥 Тепловизор (Predator Mode)", function(state)
+    if state then
+        Lighting.Ambient = Color3.fromRGB(0, 0, 100)
+        Lighting.OutdoorAmbient = Color3.fromRGB(0, 0, 30)
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= lp and plr.Character then
+                local hl = Instance.new("Highlight", plr.Character)
+                hl.Name = "ThermalESP"
+                hl.FillColor = Color3.fromRGB(255, 0, 0)
+                hl.OutlineColor = Color3.fromRGB(255, 255, 0)
+            end
+        end
+    else
+        Lighting.Ambient = origAmbient
+        Lighting.OutdoorAmbient = origOutdoor
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("Highlight") and v.Name == "ThermalESP" then v:Destroy() end
+        end
+    end
+end)
+
+createToggle("👻 Голограммы игроков", function(state)
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= lp and plr.Character then
+            for _, p in pairs(plr.Character:GetDescendants()) do
+                if p:IsA("BasePart") then
+                    if state then
+                        if not p:GetAttribute("OldPlrMat") then p:SetAttribute("OldPlrMat", p.Material.Name) end
+                        p.Material = Enum.Material.ForceField
+                    else
+                        local old = p:GetAttribute("OldPlrMat")
+                        if old then pcall(function() p.Material = Enum.Material[old] end) end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+createToggle("🎯 ESP Линии (Трейсеры)", function(state)
+    if state then
+        _G.Tracers = RunService.RenderStepped:Connect(function()
+            if not lp.Character or not lp.Character:FindFirstChild("HumanoidRootPart") then return end
+            local myRoot = lp.Character.HumanoidRootPart
+            
+            for _, plr in pairs(Players:GetPlayers()) do
+                if plr ~= lp and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                    local enemyRoot = plr.Character.HumanoidRootPart
+                    local attach1 = myRoot:FindFirstChild("TracerSrc_"..plr.Name) or Instance.new("Attachment", myRoot)
+                    attach1.Name = "TracerSrc_"..plr.Name
+                    
+                    local attach2 = enemyRoot:FindFirstChild("TracerDst") or Instance.new("Attachment", enemyRoot)
+                    attach2.Name = "TracerDst"
+                    local beam = attach1:FindFirstChild("Beam") or Instance.new("Beam", attach1)
+                    beam.Name = "Beam"
+                    beam.Attachment0 = attach1
+                    beam.Attachment1 = attach2
+                    beam.Color = ColorSequence.new(Color3.fromRGB(255, 0, 0))
+                    beam.FaceCamera = true
+                    beam.Width0 = 0.1
+                    beam.Width1 = 0.1
+                end
+            end
+        end)
+    else
+        if _G.Tracers then _G.Tracers:Disconnect() end
+        if lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+            for _, v in pairs(lp.Character.HumanoidRootPart:GetChildren()) do
+                if string.match(v.Name, "TracerSrc_") then v:Destroy() end
+            end
+        end
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local a = plr.Character.HumanoidRootPart:FindFirstChild("TracerDst")
+                if a then a:Destroy() end
+            end
+        end
+    end
+end)
+
+createToggle("🚫 Скрыть текстуры/плакаты", function(state)
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("Decal") or v:IsA("Texture") then
+            v.Transparency = state and 1 or 0
+        end
+    end
+end)
+
+createCategory("✨ АУРЫ (ПОЛНОСТЬЮ ИСПРАВЛЕНЫ)")
+
+-- Старые ауры (исправленные)
+createToggle("🔥 Аура: Огонь (Супер Саян)", function(state)
+    removeAura("HubFireAura")
+    if state and lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+        local fire = Instance.new("Fire", lp.Character.HumanoidRootPart)
+        fire.Name = "HubFireAura"
+        fire.Size = 12
+        fire.Heat = 20
+    end
+end)
+createToggle("⚡ Аура: Искры (Энергия)", function(state)
+    removeAura("HubSparksAura")
+    if state and lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+        local sparks = Instance.new("Sparkles", lp.Character.HumanoidRootPart)
+        sparks.Name = "HubSparksAura"
+        sparks.SparkleColor = Color3.fromRGB(0, 255, 255)
+    end
+end)
+createToggle("🌟 Аура: Золотой Путь", function(s)
+    removeAura("GoldAura")
+    if s and lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+        local p = Instance.new("ParticleEmitter", lp.Character.HumanoidRootPart)
+        p.Name = "GoldAura"
+        p.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+        p.Color = ColorSequence.new(Color3.fromRGB(255, 215, 0))
+        p.LightEmission = 1
+        p.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 3), NumberSequenceKeypoint.new(1, 0)})
+        p.Lifetime = NumberRange.new(1, 2)
+        p.Rate = 50
+        p.Speed = NumberRange.new(5, 10)
+        p.SpreadAngle = Vector2.new(360, 360)
+        p.ZOffset = 1
+    end
+end)
+createToggle("🌑 Аура: Тьма", function(s)
+    removeAura("DarkAura")
+    if s and lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+        local p = Instance.new("ParticleEmitter", lp.Character.HumanoidRootPart)
+        p.Name = "DarkAura"
+        p.Texture = "rbxasset://textures/particles/smoke_main.dds"
+        p.Color = ColorSequence.new(Color3.fromRGB(0, 0, 0))
+        p.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 4), NumberSequenceKeypoint.new(1, 8)})
+        p.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 1)})
+        p.Lifetime = NumberRange.new(1.5, 3)
+        p.Rate = 60
+        p.Speed = NumberRange.new(2, 4)
+        p.Rotation = NumberRange.new(0, 360)
+        p.RotSpeed = NumberRange.new(-50, 50)
+        p.ZOffset = 1
+    end
+end)
+
+createCategory("🪐 ОРБИТАЛЬНЫЕ СИСТЕМЫ")
+
+-- Орбитальная аура (старая)
+local orbitConnection
+createToggle("🪐 Орбитальная Аура (Планеты)", function(state)
+    local char = lp.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    if state then
+        local parts = {}
+        for i = 1, 3 do
+            local p = Instance.new("Part")
+            p.Shape = Enum.PartType.Ball
+            p.Size = Vector3.new(2, 2, 2)
+            p.Anchored = true
+            p.CanCollide = false
+            p.Color = (i == 1) and Color3.new(0, 0, 0) or Color3.new(0.5, 0.5, 1)
+            p.Parent = char
+            table.insert(parts, p)
+        end
+        orbitConnection = RunService.RenderStepped:Connect(function()
+            local time = tick()
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if not root then return end
+            for i, part in pairs(parts) do
+                local angle = time * 2 + (i * 2)
+                part.CFrame = root.CFrame * CFrame.new(math.cos(angle) * 8, 0, math.sin(angle) * 8)
+            end
+        end)
+    else
+        if orbitConnection then orbitConnection:Disconnect() end
+        for _, v in pairs(char:GetChildren()) do
+            if v:IsA("Part") and v.Shape == Enum.PartType.Ball then v:Destroy() end
+        end
+    end
+end)
+
+-- Новая планетарная система (Ад, Земля, Луна)
+local planetSystemConnection = nil
+local planetModels = {}
+createToggle("🪐 Планетарная система (Ад, Земля, Луна)", function(state)
+    if state then
+        local function createPlanet(color, speed, offset, yMod)
+            local model = Instance.new("Model", workspace)
+            model.Name = "PlanetCore"
+            
+            local p = Instance.new("Part", model)
+            p.Shape = Enum.PartType.Ball
+            p.Size = Vector3.new(4, 4, 4)
+            p.Color = color
+            p.Material = Enum.Material.Neon
+            p.Anchored = true
+            p.CanCollide = false
+            
+            local ring = Instance.new("Part", model)
+            ring.Shape = Enum.PartType.Cylinder
+            ring.Size = Vector3.new(0.5, 6, 6)
+            ring.Color = color
+            ring.Material = Enum.Material.ForceField
+            ring.Anchored = true
+            ring.CanCollide = false
+            ring.Transparency = 0.3
+            
+            return {Model = model, Part = p, Ring = ring, Speed = speed, Offset = offset, YMod = yMod}
+        end
+        
+        local planets = {
+            createPlanet(Color3.fromRGB(255, 50, 50), 2, 10, 0),
+            createPlanet(Color3.fromRGB(0, 150, 255), 3, 7, 2),
+            createPlanet(Color3.fromRGB(255, 255, 0), 5, 5, -2)
+        }
+        planetModels = planets
+        
+        planetSystemConnection = RunService.RenderStepped:Connect(function()
+            local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+            if not hrp then return end
+            for _, pData in pairs(planets) do
+                local t = tick() * pData.Speed
+                local x = math.cos(t) * pData.Offset
+                local z = math.sin(t) * pData.Offset
+                local y = math.sin(t) * pData.YMod
+                local pos = hrp.CFrame * CFrame.new(x, y, z)
+                pData.Part.CFrame = pos * CFrame.Angles(t, t, 0)
+                pData.Ring.CFrame = pos * CFrame.Angles(0, 0, 1.57)
+            end
+        end)
+    else
+        if planetSystemConnection then
+            planetSystemConnection:Disconnect()
+            planetSystemConnection = nil
+        end
+        for _, pData in pairs(planetModels) do
+            if pData.Model then pData.Model:Destroy() end
+        end
+        planetModels = {}
+        for _, v in pairs(workspace:GetChildren()) do
+            if v.Name == "PlanetCore" then v:Destroy() end
+        end
+    end
+end)
+
+createCategory("🔥 НОВЫЕ АУРЫ (+5)")
+
+createToggle("❄️ Снежная буря (Ice Storm)", function(s)
+    removeAura("IceAura")
+    if s and lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+        local p = Instance.new("ParticleEmitter", lp.Character.HumanoidRootPart)
+        p.Name = "IceAura"
+        p.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+        p.Color = ColorSequence.new(Color3.fromRGB(150, 255, 255))
+        p.Size = NumberSequence.new(0.5)
+        p.Lifetime = NumberRange.new(2, 4)
+        p.Rate = 150
+        p.Speed = NumberRange.new(10, 20)
+        p.EmissionDirection = Enum.NormalId.Top
+        p.SpreadAngle = Vector2.new(180, 180)
+        p.Acceleration = Vector3.new(0, -20, 0)
+    end
+end)
+createToggle("🩸 Кровавая жажда (Blood)", function(s)
+    removeAura("BloodAura")
+    if s and lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+        local p = Instance.new("ParticleEmitter", lp.Character.HumanoidRootPart)
+        p.Name = "BloodAura"
+        p.Texture = "rbxasset://textures/particles/smoke_main.dds"
+        p.Color = ColorSequence.new(Color3.fromRGB(180, 0, 0))
+        p.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0)})
+        p.Lifetime = NumberRange.new(1, 2)
+        p.Rate = 80
+        p.Speed = NumberRange.new(5, 15)
+        p.EmissionDirection = Enum.NormalId.Top
+        p.Acceleration = Vector3.new(0, 10, 0)
+    end
+end)
+createToggle("☢️ Токсичное облако (Poison)", function(s)
+    removeAura("ToxicAura")
+    if s and lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+        local p = Instance.new("ParticleEmitter", lp.Character.HumanoidRootPart)
+        p.Name = "ToxicAura"
+        p.Texture = "rbxasset://textures/particles/smoke_main.dds"
+        p.Color = ColorSequence.new(Color3.fromRGB(50, 255, 50))
+        p.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 5), NumberSequenceKeypoint.new(1, 10)})
+        p.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.8), NumberSequenceKeypoint.new(1, 1)})
+        p.Lifetime = NumberRange.new(3, 5)
+        p.Rate = 30
+        p.Speed = NumberRange.new(1, 2)
+        p.Rotation = NumberRange.new(0, 360)
+        p.RotSpeed = NumberRange.new(-20, 20)
+    end
+end)
+createToggle("🌌 Галактика (Galaxy)", function(s)
+    removeAura("GalaxyAura")
+    if s and lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+        local p = Instance.new("ParticleEmitter", lp.Character.HumanoidRootPart)
+        p.Name = "GalaxyAura"
+        p.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+        p.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(150, 0, 255)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 100, 255)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 255))
+        })
+        p.LightEmission = 0.5
+        p.Size = NumberSequence.new(1)
+        p.Lifetime = NumberRange.new(2, 3)
+        p.Rate = 100
+        p.Speed = NumberRange.new(5, 10)
+        p.SpreadAngle = Vector2.new(360, 360)
+        p.RotSpeed = NumberRange.new(100, 200)
+    end
+end)
+createToggle("👼 Святой свет (Holy)", function(s)
+    removeAura("HolyAura")
+    if s and lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+        local p = Instance.new("ParticleEmitter", lp.Character.HumanoidRootPart)
+        p.Name = "HolyAura"
+        p.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+        p.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
+        p.LightEmission = 1
+        p.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 4), NumberSequenceKeypoint.new(1, 0)})
+        p.Lifetime = NumberRange.new(1, 2)
+        p.Rate = 40
+        p.Speed = NumberRange.new(2, 5)
+        p.EmissionDirection = Enum.NormalId.Top
+        p.Acceleration = Vector3.new(0, 5, 0)
+    end
+end)
+
+-- ================= TOUHOU AURAS (TH06-TH08) =================
+createCategory("🌸 TOUHOU AURAS (TH06-TH08)")
+
+-- Вспомогательная функция для создания Touhou-ауры
+local function createTouhouAura(text, name, color, props)
+    createToggle(text, function(state)
+        removeAura(name)
+        if state and lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+            local p = Instance.new("ParticleEmitter", lp.Character.HumanoidRootPart)
+            p.Name = name
+            p.ZOffset = 1
+            for k, v in pairs(props) do
+                p[k] = v
+            end
+        end
+    end)
+end
+
+-- Текстуры
+local TEX_SPARK = "rbxasset://textures/particles/sparkles_main.dds"
+local TEX_SMOKE = "rbxasset://textures/particles/smoke_main.dds"
+
+-- TH06
+createTouhouAura("🌑 Румия (Apparitions Stalk the Night)", "Rumia", nil, {
+    Texture = TEX_SMOKE, Rate = 80, Speed = NumberRange.new(2, 4), Lifetime = NumberRange.new(2, 4),
+    Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 5), NumberSequenceKeypoint.new(1, 10)}),
+    Color = ColorSequence.new(Color3.fromRGB(0, 0, 0)),
+    Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 1)}),
+    Rotation = NumberRange.new(0, 360), RotSpeed = NumberRange.new(-20, 20)
+})
+createTouhouAura("❄️ Сырно (Perfect Freeze)", "Cirno", nil, {
+    Texture = TEX_SPARK, Rate = 150, Speed = NumberRange.new(5, 15), Lifetime = NumberRange.new(1.5, 3),
+    Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 1.5), NumberSequenceKeypoint.new(1, 0)}),
+    Color = ColorSequence.new(Color3.fromRGB(150, 255, 255)), LightEmission = 1,
+    SpreadAngle = Vector2.new(360, 360), Drag = 1
+})
+createTouhouAura("📖 Пачули (Five Elements)", "Patchouli", nil, {
+    Texture = TEX_SPARK, Rate = 100, Speed = NumberRange.new(3, 6), Lifetime = NumberRange.new(3, 5),
+    Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(0.5, 1.5), NumberSequenceKeypoint.new(1, 0)}),
+    Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255,0,0)), ColorSequenceKeypoint.new(0.25, Color3.fromRGB(0,0,255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0,255,0)), ColorSequenceKeypoint.new(0.75, Color3.fromRGB(255,255,0)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(150,0,255))
+    }), LightEmission = 0.8, SpreadAngle = Vector2.new(360, 360), RotSpeed = NumberRange.new(50, 100)
+})
+createTouhouAura("🔪 Сакуя (World of Nightmares)", "Sakuya", nil, {
+    Texture = TEX_SMOKE, Rate = 150, Speed = NumberRange.new(30, 60), Lifetime = NumberRange.new(0.2, 0.4),
+    Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 2)}),
+    Color = ColorSequence.new(Color3.fromRGB(220, 230, 255)),
+    SpreadAngle = Vector2.new(180, 180), Rotation = NumberRange.new(45, 45)
+})
+createTouhouAura("🦇 Ремилия (Spear the Gungnir)", "Remilia", nil, {
+    Texture = TEX_SPARK, Rate = 300, Speed = NumberRange.new(10, 20), Lifetime = NumberRange.new(0.5, 1),
+    Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 2), NumberSequenceKeypoint.new(1, 0)}),
+    Color = ColorSequence.new(Color3.fromRGB(255, 0, 50)), LightEmission = 1,
+    SpreadAngle = Vector2.new(45, 45), EmissionDirection = Enum.NormalId.Top
+})
+createTouhouAura("🔥 Фландр (Starbow Break)", "Flandre", nil, {
+    Texture = TEX_SPARK, Rate = 300, Speed = NumberRange.new(20, 40), Lifetime = NumberRange.new(1, 2),
+    Size = NumberSequence.new(1),
+    Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255,0,0)), ColorSequenceKeypoint.new(0.3, Color3.fromRGB(0,255,0)),
+        ColorSequenceKeypoint.new(0.6, Color3.fromRGB(0,0,255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255,255,0))
+    }), LightEmission = 1, SpreadAngle = Vector2.new(360, 360), Drag = 3
+})
+
+-- TH07
+createTouhouAura("🎎 Алиса (Artful Sacrifice)", "Alice", nil, {
+    Texture = TEX_SPARK, Rate = 120, Speed = NumberRange.new(5, 10), Lifetime = NumberRange.new(2, 4),
+    Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 2), NumberSequenceKeypoint.new(1, 0)}),
+    Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255,100,100)), ColorSequenceKeypoint.new(1, Color3.fromRGB(100,100,255))}),
+    LightEmission = 0.8, SpreadAngle = Vector2.new(360, 360), Acceleration = Vector3.new(0, 2, 0)
+})
+createTouhouAura("⚔️ Ёму (Slash of Eternity)", "Youmu", nil, {
+    Texture = TEX_SMOKE, Rate = 200, Speed = NumberRange.new(40, 80), Lifetime = NumberRange.new(0.1, 0.3),
+    Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 4)}),
+    Color = ColorSequence.new(Color3.fromRGB(150, 255, 150)), LightEmission = 0.5,
+    SpreadAngle = Vector2.new(10, 10), EmissionDirection = Enum.NormalId.Front
+})
+createTouhouAura("🌸 Ююко (Cherry Blossom Flurry)", "Yuyuko", nil, {
+    Texture = TEX_SMOKE, Rate = 100, Speed = NumberRange.new(4, 8), Lifetime = NumberRange.new(3, 6),
+    Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.5, 3), NumberSequenceKeypoint.new(1, 0)}),
+    Color = ColorSequence.new(Color3.fromRGB(255, 180, 220)),
+    SpreadAngle = Vector2.new(360, 360), Acceleration = Vector3.new(0, 1, 0), RotSpeed = NumberRange.new(-50, 50)
+})
+createTouhouAura("👁️ Юкари (Boundary of Gaps)", "Yukari", nil, {
+    Texture = TEX_SMOKE, Rate = 60, Speed = NumberRange.new(1, 3), Lifetime = NumberRange.new(4, 6),
+    Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 2), NumberSequenceKeypoint.new(0.5, 7), NumberSequenceKeypoint.new(1, 0)}),
+    Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(150,0,255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255,0,50))}),
+    Rotation = NumberRange.new(0, 360), RotSpeed = NumberRange.new(-30, 30), SpreadAngle = Vector2.new(360, 360)
+})
+
+-- TH08
+createTouhouAura("🐇 Рейсен (Lunatic Red Eyes)", "Reisen", nil, {
+    Texture = TEX_SPARK, Rate = 200, Speed = NumberRange.new(15, 30), Lifetime = NumberRange.new(1, 2),
+    Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 2), NumberSequenceKeypoint.new(1, 0)}),
+    Color = ColorSequence.new(Color3.fromRGB(255, 50, 100)), LightEmission = 1,
+    SpreadAngle = Vector2.new(360, 360), RotSpeed = NumberRange.new(200, 400)
+})
+createTouhouAura("🌌 Эйрин (Galaxy in a Pot)", "Eirin", nil, {
+    Texture = TEX_SPARK, Rate = 150, Speed = NumberRange.new(5, 10), Lifetime = NumberRange.new(2, 4),
+    Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 3), NumberSequenceKeypoint.new(1, 0)}),
+    Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(0,0,255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(150,255,255))}),
+    LightEmission = 0.8, Acceleration = Vector3.new(0, 5, 0), RotSpeed = NumberRange.new(-100, 100)
+})
+createTouhouAura("🎋 Кагуя (Impossible Requests)", "Kaguya", nil, {
+    Texture = TEX_SPARK, Rate = 150, Speed = NumberRange.new(10, 20), Lifetime = NumberRange.new(2, 3),
+    Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 1.5), NumberSequenceKeypoint.new(1, 0)}),
+    Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255,0,0)), ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0,255,0)),
+        ColorSequenceKeypoint.new(0.66, Color3.fromRGB(0,0,255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255,255,0))
+    }), LightEmission = 1, SpreadAngle = Vector2.new(180, 180), EmissionDirection = Enum.NormalId.Top
+})
+createTouhouAura("🔥 Моко (Immortal Phoenix)", "Mokou", nil, {
+    Texture = TEX_SMOKE, Rate = 250, Speed = NumberRange.new(10, 25), Lifetime = NumberRange.new(1, 2.5),
+    Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 2), NumberSequenceKeypoint.new(1, 5)}),
+    Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,0)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255,50,0)), ColorSequenceKeypoint.new(1, Color3.fromRGB(50,0,0))}),
+    LightEmission = 0.5, SpreadAngle = Vector2.new(45, 45), Acceleration = Vector3.new(0, 30, 0), EmissionDirection = Enum.NormalId.Top
+})
+
+createCategory("🎭 СИСТЕМА")
+
+-- Кнопка закрытия
+local btnDestroy = Instance.new("TextButton")
+btnDestroy.Size = UDim2.new(1, -10, 0, 38)
+btnDestroy.BackgroundColor3 = Color3.fromRGB(150, 30, 30)
+btnDestroy.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnDestroy.TextSize = 15
+btnDestroy.Font = Enum.Font.GothamBold
+btnDestroy.Text = "❌ ЗАКРЫТЬ И УДАЛИТЬ ХАБ"
+btnDestroy.LayoutOrder = layoutCounter
+btnDestroy.Parent = Scroll
+Instance.new("UICorner", btnDestroy).CornerRadius = UDim.new(0, 6)
+layoutCounter = layoutCounter + 1
+
+btnDestroy.MouseButton1Click:Connect(function()
+    -- Удаляем все GUI и эмиттеры
+    ScreenGui:Destroy()
+    if lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+        for _, v in pairs(lp.Character.HumanoidRootPart:GetChildren()) do
+            if v:IsA("ParticleEmitter") or v:IsA("Fire") or v:IsA("Sparkles") then
+                v:Destroy()
+            end
+        end
+    end
+    -- Очистка орбитальных систем и планет
+    if orbitConnection then orbitConnection:Disconnect() end
+    if planetSystemConnection then planetSystemConnection:Disconnect() end
+    for _, v in pairs(workspace:GetChildren()) do
+        if v.Name == "PlanetCore" then v:Destroy() end
+    end
+    -- Очистка Highlight'ов и трейсеров
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("Highlight") and (v.Name == "HubESP" or v.Name == "ThermalESP" or v.Name == "ToonHL" or v.Name == "HubToon") then
+            v:Destroy()
+        end
+    end
+    if _G.ESP then _G.ESP:Disconnect() end
+    if _G.Tracers then _G.Tracers:Disconnect() end
+    print("[Хаб удалён]")
+end)
+
+-- === УПРАВЛЕНИЕ ВИДИМОСТЬЮ ===
+local visible = true
+UIS.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        visible = not visible
+        MainFrame.Visible = visible
+    end
+end)
+
+print("✅ [TITAN VISUAL v10 + TOUHOU HUB] — Все функции объединены! Наслаждайтесь!")
